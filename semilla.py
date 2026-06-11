@@ -1,6 +1,8 @@
 import json
+from datetime import date, datetime
 from app import app, db
-from models import Alojamiento, Actividad, Servicio
+from models import Alojamiento, Actividad, Servicio, Usuario, Reserva
+from werkzeug.security import generate_password_hash
 
 # Datos completos de los alojamientos en Argentina
 ALOJAMIENTOS_SEMILLA = [
@@ -9,13 +11,14 @@ ALOJAMIENTOS_SEMILLA = [
     "title": "Cavas Wine Lodge",
     "location": "Mendoza",
     "province": "Mendoza",
-    "price": 480,
+    "price": 20,
     "rating": 4.95,
     "reviewsCount": 142,
     "images": [
-      "https://th.bing.com/th/id/R.a808fd675ac69265ac047796d4c589ee?rik=S%2fjFHGR%2b6F90Qw&pid=ImgRaw&r=0",
-      "https://picsum.photos/seed/cavas2/800/600",
-      "https://picsum.photos/seed/cavas3/800/600"
+      "https://theluxtraveller.com/wp-content/uploads/2014/01/Cavas-Wine-Lodge-Mendoza.jpg",
+      "https://images.unsplash.com/photo-1560493676-04071c5f467b?q=80&w=800&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?q=80&w=800&auto=format&fit=crop",
+      "https://www.chandon.com.ar/wp-content/uploads/2024/01/MG_0859.jpg",
     ],
     "type": "all_inclusive",
     "experienceLabel": "All Inclusive Premium",
@@ -40,13 +43,16 @@ ALOJAMIENTOS_SEMILLA = [
     "title": "Llao Llao Resort & Golf",
     "location": "Bariloche",
     "province": "Río Negro",
-    "price": 390,
+    "price": 70,
     "rating": 4.89,
     "reviewsCount": 312,
     "images": [
-      "https://picsum.photos/seed/llao1/800/600",
-      "https://picsum.photos/seed/llao2/800/600",
-      "https://picsum.photos/seed/llao3/800/600"
+      "https://latam.beyondba.com/wp-content/uploads/2023/06/dsc9493-scaled.jpg",
+      "https://images.blacktomato.com/2016/08/Llao-Llao-8.jpg?auto=compress%2Cformat&fit=scale&h=1203&ixlib=php-3.3.0&w=2048&s=c53679b52962f581235ed7bb7d73d38b",
+      "https://www.fivestaralliance.com/files/fivestaralliance.com/field/image/nodes/2009/10533/10533_0_llaollaohotelandresort_fsa-g.jpg",
+      "https://www.emporiumtravel.de/files/content/royal-hideaways/ferne_laender/argentinien/llao-llao-hotel-resort-golf-spa/llao-llao-hotel-resort-golf-spa-3.jpg",
+      "https://st3.idealista.pt/news/arquivos/styles/fullwidth_xl/public/2012-12/127.jpg?VersionId=ce1IYgselK3qWzhL9c6Y587uYmKgdtiI&itok=jzlXNtcD"
+      
     ],
     "type": "estadia",
     "experienceLabel": "Solo Estadía de Lujo",
@@ -71,13 +77,16 @@ ALOJAMIENTOS_SEMILLA = [
     "title": "Gran Meliá Iguazú",
     "location": "Iguazú",
     "province": "Misiones",
-    "price": 350,
+    "price": 35,
     "rating": 4.87,
     "reviewsCount": 228,
     "images": [
-      "https://picsum.photos/seed/melia1/800/600",
-      "https://picsum.photos/seed/melia2/800/600",
-      "https://picsum.photos/seed/melia3/800/600"
+      "https://3.bp.blogspot.com/-KQaAzpxB4v8/VFl2eKV8QII/AAAAAAAAEsQ/BeuEO65Y3w4CiHgLbK3FBQAsiSaSOrk4QCPcB/s1600/imagen-aerea-cataratas-del-iguazu.jpg",
+      " https://th.bing.com/th/id/R.003f7c0cf08357e71ab6fe2158892363?rik=uWBLp%2f%2fkdHMFdQ&pid=ImgRaw&r=0",
+      "https://images.squarespace-cdn.com/content/v1/5856bc666a49634cd55b0ba9/0dbe1767-5d0b-48a9-8e86-48cae9f7142a/iguazu-falls.jpeg ",
+      "https://wallpapercave.com/wp/WjQ8rcA.jpg",
+      "https://et-website.s3.amazonaws.com/uploads/2018/08/Enchanting-Travels-Iguazu-Falls-Argentina-Tours-1.jpg"
+
     ],
     "type": "viaje",
     "experienceLabel": "Viaje con Aventura",
@@ -102,13 +111,15 @@ ALOJAMIENTOS_SEMILLA = [
     "title": "Eolo - Patagonia's Spirit",
     "location": "Patagonia",
     "province": "Santa Cruz",
-    "price": 520,
+    "price": 30,
     "rating": 4.97,
     "reviewsCount": 98,
     "images": [
-      "https://picsum.photos/seed/eolo1/800/600",
-      "https://picsum.photos/seed/eolo2/800/600",
-      "https://picsum.photos/seed/eolo3/800/600"
+      "https://www.elcalafateya.com/wp-content/uploads/2019/03/camaras-vivo-calafate-santa-cruz-argentina-e1551725687400.jpg",
+      "https://gopatagonic.com/wp-content/uploads/2024/11/52648405035_3533b73fce_o.jpg",
+      "https://tolkeyenpatagonia.com/wp-content/uploads/2019/01/glaciar-sur-pioneros-1.jpg",
+      "https://blog.moebiusviajes.com/wp-content/uploads/2020/12/LOS-10-MEJORES-HOTELES-EN-EL-CALAFATE-EN-2020-altocalafate-946x568-6-768x461.jpg",
+      "https://unaideaunviaje.com/wp-content/uploads/2015/05/calafate-perito-moreno-unaideaunviaje-10.jpg"
     ],
     "type": "all_inclusive",
     "experienceLabel": "All Inclusive Explorer",
@@ -133,13 +144,15 @@ ALOJAMIENTOS_SEMILLA = [
     "title": "Faena Hotel Buenos Aires",
     "location": "Buenos Aires",
     "province": "CABA",
-    "price": 280,
+    "price": 80,
     "rating": 4.79,
     "reviewsCount": 415,
     "images": [
-      "https://picsum.photos/seed/faena1/800/600",
-      "https://picsum.photos/seed/faena2/800/600",
-      "https://picsum.photos/seed/faena3/800/600"
+      "https://media.istockphoto.com/id/534164779/photo/faena-hotel-at-puerto-madero-buenos-aires-argentina.jpg?s=170667a&w=0&k=20&c=_Q1kqWVX--qr9aUmHz08jVWeelyOEivYnKHsZfvnYlc=",
+      "https://www.myboutiquehotel.com/photos/5640/faena-hotel-buenos-aires-buenos-aires-034-84178-1110x700.jpg",
+      "https://th.bing.com/th/id/R.19b2e04409327390a9ebad587b37dcb8?rik=sxslNkL9yzb7Fw&riu=http%3a%2f%2fmedia.architecturaldigest.com%2fphotos%2f582de0290058935c3e94c0a4%2fmaster%2fpass%2ffaena-buenos-aires-02.jpg&ehk=cgnmpIDW9MKltVMacoZk6fkElGFt%2fNR7QxYkb5P%2fSUE%3d&risl=&pid=ImgRaw&r=0",
+      "https://static.prod.r53.tablethotels.com/media/hotels/slideshow_images_staged/large/1098191.jpg",
+      "https://faena.buenosaireshotelsargentina.com/data/Pictures/OriginalPhoto/2800/280059/280059753/buenos-aires-faena-hotel-picture-38.JPEG"
     ],
     "type": "estadia",
     "experienceLabel": "Solo Estadía / Arte",
@@ -161,30 +174,32 @@ ALOJAMIENTOS_SEMILLA = [
   },
   {
     "id": "mendoza-casa-de-uco",
-    "title": "Casa de Uco Vineyards & Wine Resort",
-    "location": "Mendoza",
+    "title": "Las Leñas Ski Resort",
+    "location": "Las Leñas, Malargüe",
     "province": "Mendoza",
-    "price": 410,
+    "price": 40,
     "rating": 4.91,
     "reviewsCount": 118,
     "images": [
-      "https://picsum.photos/seed/uco1/800/600",
-      "https://picsum.photos/seed/uco2/800/600",
-      "https://picsum.photos/seed/uco3/800/600"
+      "https://th.bing.com/th/id/R.1afc1eb518a9b4b4260015866992af3e?rik=dSmmhVOvm3R5yw&pid=ImgRaw&r=0",
+      "https://th.bing.com/th/id/R.021ca39f76a0e378686f7db95685cf51?rik=BqRcd5Dry2FDmQ&pid=ImgRaw&r=0",
+      "https://laslenas.com/wp-content/uploads/2023/06/nota3-1.jpg",
+      "https://tse1.mm.bing.net/th/id/OIP.V_Qa6rEIBC1mu-XTnGhZ9AHaD8?r=0&rs=1&pid=ImgDetMain&o=7&rm=3",
+      "https://images.travelclass.tur.br/uploads/2018/09/restaurantes-valle-nevado.jpg"
     ],
     "type": "viaje",
-    "experienceLabel": "Viaje Enológico",
-    "description": "Situado en el corazón del Valle de Uco, rodeado de viñedos y de la imponente cordillera. Un hotel de diseño minimalista y concreto que flota sobre una laguna privada. Ofrece una inmersión directa en la elaboración de tu propio vino.",
+    "experienceLabel": "Viaje con Nieve",
+    "description":"Las Leñas es el principal centro de esquí de Argentina, ubicado en el corazón de la cordillera de los Andes. Con una de las temporadas más largas de Sudamérica y una infraestructura de primer nivel, ofrece pistas para todos los niveles, desde principiantes hasta expertos. Además de esquí y snowboard, Las Leñas cuenta con una amplia variedad de actividades para disfrutar al máximo de la montaña.",
     "activities": [
-      "Cosecha y taller de blending de vino propio",
-      "Trekking de alta montaña en Manzano Histórico",
-      "Cabalgata entre viñedos con asado criollo al aire libre",
+      "Esquí y snowboard",
+      "Ascenso al Cerro Chapelco en telesilla panorámica",
+      "Trekking guiado por senderos patagónicos",
       "Clase de arquería y paseos en bicicleta por el valle"
     ],
     "amenities": [
-      "Laguna privada",
-      "Bodega de última generación",
-      "Spa con tratamientos de agua mineral propia",
+      "Pistas de esquí de nivel internacional",
+      "Escuela de esquí con instructores certificados",
+      "Alquiler de equipos de esquí y snowboard",
       "Bicicletas de montaña gratuitas",
       "Sector de fuegos exterior"
     ],
@@ -195,13 +210,15 @@ ALOJAMIENTOS_SEMILLA = [
     "title": "Estancia El Colibrí",
     "location": "Córdoba",
     "province": "Córdoba",
-    "price": 340,
+    "price": 30,
     "rating": 4.90,
     "reviewsCount": 86,
     "images": [
-      "https://picsum.photos/seed/colibri1/800/600",
-      "https://picsum.photos/seed/colibri2/800/600",
-      "https://picsum.photos/seed/colibri3/800/600"
+      "https://www.estanciaelcolibri.com/wp-content/uploads/2025/02/facade-cordoba-2.png",
+      "https://www.estanciaelcolibri.com/wp-content/uploads/2025/02/facade-drone-argentine-1.png",
+      "https://tse4.mm.bing.net/th/id/OIP.stuKaD-Eff7S_OZjLL_bGgHaE8?r=0&rs=1&pid=ImgDetMain&o=7&rm=3",
+      "https://www.qietut.com/wp-content/uploads/2021/11/qietut-estancia-el-colibri-experiences-horseriding-family.jpg",
+      "https://www.estanciaelcolibri.com/cdn-cgi/image/quality=70,format=auto,onerror=redirect,metadata=none/wp-content/uploads/2025/02/H-oa-20ans-.png"
     ],
     "type": "all_inclusive",
     "experienceLabel": "All Inclusive Estancia",
@@ -226,13 +243,15 @@ ALOJAMIENTOS_SEMILLA = [
     "title": "Correntoso Lake & River Hotel",
     "location": "Neuquén",
     "province": "Neuquén",
-    "price": 370,
+    "price": 37,
     "rating": 4.93,
     "reviewsCount": 154,
     "images": [
-      "https://picsum.photos/seed/correntoso1/800/600",
-      "https://picsum.photos/seed/correntoso2/800/600",
-      "https://picsum.photos/seed/correntoso3/800/600"
+      "https://turismo-en-argentina.com/wp-content/uploads/2023/02/Turismo-en-Neuquen-1024x439.jpg",
+      "https://www.interpatagonia.com/plantillas/grandes/34096-01Gr.jpg",
+      "https://tse4.mm.bing.net/th/id/OIP.5dBGGw29WJVB77EXoL_iHAHaHa?r=0&pid=ImgDet&w=474&h=474&rs=1&o=7&rm=3",
+      "https://d1x2jsuj9gaph.cloudfront.net/imageRepo/6/0/101/998/155/13_P.jpg",
+      "https://www.interpatagonia.com/plantillas/grandes/17487-07Gr.jpg"
     ],
     "type": "estadia",
     "experienceLabel": "Solo Estadía Premium",
@@ -257,13 +276,15 @@ ALOJAMIENTOS_SEMILLA = [
     "title": "Estancia Colomé",
     "location": "Salta",
     "province": "Salta",
-    "price": 420,
+    "price": 20,
     "rating": 4.96,
     "reviewsCount": 78,
     "images": [
-      "https://picsum.photos/seed/colome1/800/600",
-      "https://picsum.photos/seed/colome2/800/600",
-      "https://picsum.photos/seed/colome3/800/600"
+      "https://www.amerian.com/wp-content/uploads/2025/09/03B_Banner_958x574_3a1729a2-26af-45e7-8626-30c91015b84d.jpg",
+      "https://www.welcomeargentina.com/paseos/museo-james-turrell/museo-james-turrell-a.jpg",
+      "https://images.adsttc.com/media/images/5d27/a094/284d/d1c1/d200/014a/slideshow/james_turrell_guggenheim_01.jpg?1562878083",
+      "https://www.estilodv.com/public/images/guia/3444-bodega-colome.jpg",
+      "https://i.pinimg.com/originals/a3/8e/3a/a38e3ae464c85b5aa943bf085fd9ced5.jpg"
     ],
     "type": "viaje",
     "experienceLabel": "Viaje de Altura",
@@ -286,15 +307,31 @@ ALOJAMIENTOS_SEMILLA = [
 ]
 
 def cargar_semillas():
-    print("[INFO] Vaciando tablas existentes...")
-    # Eliminar datos para evitar duplicados en la base de datos
-    db.session.query(Actividad).delete()
-    db.session.query(Servicio).delete()
-    db.session.query(Alojamiento).delete()
+    print("[INFO] Recreando la base de datos (drop_all y create_all)...")
+    db.drop_all()
+    db.create_all()
+    
+    print("[INFO] Insertando usuarios de prueba...")
+    usuarios = [
+        Usuario(nombre="Juan Cliente", email="cliente@travel.com", password_hash=generate_password_hash("cliente123"), rol="cliente"),
+        Usuario(nombre="Maria Comercial", email="comercial@travel.com", password_hash=generate_password_hash("comercial123"), rol="comercial"),
+        Usuario(nombre="Carlos General", email="general@travel.com", password_hash=generate_password_hash("general123"), rol="general")
+    ]
+    for u in usuarios:
+        db.session.add(u)
     db.session.commit()
     
     print("[INFO] Insertando alojamientos, actividades y servicios...")
     for data in ALOJAMIENTOS_SEMILLA:
+        desc = 0
+        act = True
+        if data["id"] == "bariloche-llao-llao":
+            desc = 25
+        elif data["id"] == "iguazu-gran-melia":
+            desc = 10
+        elif data["id"] == "mendoza-casa-de-uco":
+            act = False
+
         aloj = Alojamiento(
             id=data["id"],
             titulo=data["title"],
@@ -306,13 +343,15 @@ def cargar_semillas():
             tipo=data["type"],
             experience_label=data["experienceLabel"],
             descripcion=data["description"],
-            destacado=data["featured"]
+            destacado=data["featured"],
+            activo=act,
+            descuento=desc
         )
         # Usamos el setter para convertir lista a JSON string
         aloj.imagenes = data["images"]
         
         db.session.add(aloj)
-        db.session.flush() # Obtiene el ID para relaciones si fuera numérico (aquí es string, pero es buena práctica)
+        db.session.flush() # Obtiene el ID para relaciones si fuera numérico
         
         # Cargar actividades asociadas
         for act_desc in data["activities"]:
@@ -323,6 +362,85 @@ def cargar_semillas():
         for srv_name in data["amenities"]:
             servicio = Servicio(alojamiento_id=aloj.id, nombre=srv_name)
             db.session.add(servicio)
+            
+    # Obtener el usuario 'Juan Cliente' (ID = 1 ya que se limpió e insertó al inicio)
+    usuario_cliente = Usuario.query.filter_by(email="cliente@travel.com").first()
+    
+    if usuario_cliente:
+        print("[INFO] Insertando reservas de prueba para estadísticas...")
+        reservas_prueba = [
+            # Reservas de Mayo 2026 (Mes anterior)
+            Reserva(
+                usuario_id=usuario_cliente.id,
+                alojamiento_id="mendoza-cavas-wine",
+                check_in=date(2026, 5, 10),
+                check_out=date(2026, 5, 13),
+                huespedes=2,
+                notes="Luna de miel en Mendoza.",
+                precio_total=1480,
+                estado="confirmed",
+                fecha_creacion=datetime(2026, 5, 1, 12, 0)
+            ),
+            Reserva(
+                usuario_id=usuario_cliente.id,
+                alojamiento_id="bariloche-llao-llao",
+                check_in=date(2026, 5, 18),
+                check_out=date(2026, 5, 22),
+                huespedes=2,
+                notes="Estadía clásica de golf.",
+                precio_total=1208,
+                estado="confirmed",
+                fecha_creacion=datetime(2026, 5, 12, 10, 30)
+            ),
+            Reserva(
+                usuario_id=usuario_cliente.id,
+                alojamiento_id="iguazu-gran-melia",
+                check_in=date(2026, 5, 25),
+                check_out=date(2026, 5, 27),
+                huespedes=3,
+                notes="Escapada familiar de aventura.",
+                precio_total=670,
+                estado="confirmed",
+                fecha_creacion=datetime(2026, 5, 20, 15, 45)
+            ),
+            # Reservas de Junio 2026 (Mes actual)
+            Reserva(
+                usuario_id=usuario_cliente.id,
+                alojamiento_id="calafate-eolo",
+                check_in=date(2026, 6, 2),
+                check_out=date(2026, 6, 7),
+                huespedes=2,
+                notes="Expedición a los glaciares.",
+                precio_total=2640,
+                estado="confirmed",
+                fecha_creacion=datetime(2026, 5, 28, 9, 15)
+            ),
+            Reserva(
+                usuario_id=usuario_cliente.id,
+                alojamiento_id="cordoba-estancia-el-colibri",
+                check_in=date(2026, 6, 12),
+                check_out=date(2026, 6, 15),
+                huespedes=2,
+                notes="Fin de semana largo de campo.",
+                precio_total=1060,
+                estado="pending",
+                fecha_creacion=datetime(2026, 6, 1, 14, 0)
+            ),
+            Reserva(
+                usuario_id=usuario_cliente.id,
+                alojamiento_id="salta-colome",
+                check_in=date(2026, 6, 20),
+                check_out=date(2026, 6, 24),
+                huespedes=2,
+                notes="Visita al museo James Turrell y cata.",
+                precio_total=1720,
+                estado="confirmed",
+                fecha_creacion=datetime(2026, 6, 5, 11, 20)
+            )
+        ]
+        
+        for r in reservas_prueba:
+            db.session.add(r)
             
     db.session.commit()
     print("[OK] Base de datos populada con exito!")

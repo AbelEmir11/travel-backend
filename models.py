@@ -12,6 +12,7 @@ class Usuario(db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(256), nullable=False)
     fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
+    rol = db.Column(db.String(30), nullable=False, default="cliente")
     
     reservas = db.relationship('Reserva', backref='usuario', lazy=True, cascade="all, delete-orphan")
 
@@ -20,7 +21,8 @@ class Usuario(db.Model):
             "id": self.id,
             "name": self.nombre,
             "email": self.email,
-            "fecha_creacion": self.fecha_creacion.isoformat()
+            "fecha_creacion": self.fecha_creacion.isoformat(),
+            "rol": self.rol
         }
 
 
@@ -39,6 +41,8 @@ class Alojamiento(db.Model):
     experience_label = db.Column(db.String(100), nullable=False)
     descripcion = db.Column(db.Text, nullable=False)
     destacado = db.Column(db.Boolean, default=False)
+    activo = db.Column(db.Boolean, default=True)
+    descuento = db.Column(db.Integer, default=0)
     
     actividades = db.relationship('Actividad', backref='alojamiento', lazy=True, cascade="all, delete-orphan")
     servicios = db.relationship('Servicio', backref='alojamiento', lazy=True, cascade="all, delete-orphan")
@@ -69,6 +73,8 @@ class Alojamiento(db.Model):
             "experienceLabel": self.experience_label,
             "description": self.descripcion,
             "featured": self.destacado,
+            "active": self.activo,
+            "discount": self.descuento,
             "activities": [act.descripcion for act in self.actividades],
             "amenities": [srv.nombre for srv in self.servicios]
         }

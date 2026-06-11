@@ -1,0 +1,28 @@
+# Entornos virtuales
+venv/
+.venv/
+env/
+ENV/
+
+# Python cache / compilados
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Variables de entorno y secretos
+.env
+
+# Base de datos local
+instance/
+*.db
+*.sqlite
+
+# IDEs y editores
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp

@@ -105,9 +105,22 @@ def obtener_perfil():
 # ==========================================
 
 @app.route("/api/alojamientos", methods=["GET"])
+@jwt_required(optional=True)
 def listar_alojamientos():
     query = Alojamiento.query
     
+    # Verificar si el usuario autenticado tiene permisos de administrador (comercial o general)
+    identidad = get_jwt_identity()
+    es_admin = False
+    if identidad:
+        usuario = Usuario.query.get(int(identidad))
+        if usuario and usuario.rol in ["comercial", "general"]:
+            es_admin = True
+            
+    # Si no es admin, solo listar alojamientos activos
+    if not es_admin:
+        query = query.filter_by(activo=True)
+        
     # Obtener parámetros de filtro
     destino = request.args.get("destino")
     precio_max = request.args.get("precio_maximo")
@@ -219,6 +232,182 @@ def listar_reservas():
     usuario_id = get_jwt_identity()
     reservas = Reserva.query.filter_by(usuario_id=int(usuario_id)).order_by(Reserva.fecha_creacion.desc()).all()
     return jsonify([res.to_dict() for res in reservas]), 200
+
+
+# ==========================================
+# RUTAS DE ADMINISTRACIÓN COMERCIAL Y GENERAL
+# ==========================================
+
+@app.route("/api/alojamientos/<id>/visibilidad", methods=["PUT"])
+@jwt_required()
+def cambiar_visibilidad(id):
+    usuario_id = get_jwt_identity()
+    usuario = Usuario.query.get(int(usuario_id))
+    if not usuario or usuario.rol not in ["comercial", "general"]:
+        return jsonify({"error": "No autorizado."}), 403
+        
+    datos = request.get_json()
+    activo = datos.get("activo")
+    if activo is None:
+        return jsonify({"error": "Falta el campo activo."}), 400
+        
+    alojamiento = Alojamiento.query.get(id)
+    if not alojamiento:
+        return jsonify({"error": "Alojamiento no encontrado."}), 404
+        
+    alojamiento.activo = bool(activo)
+    try:
+        db.session.commit()
+        return jsonify({"mensaje": "Visibilidad actualizada con éxito.", "alojamiento": alojamiento.to_dict()}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/alojamientos/<id>/promocion", methods=["PUT"])
+@jwt_required()
+def cambiar_promocion(id):
+    usuario_id = get_jwt_identity()
+    usuario = Usuario.query.get(int(usuario_id))
+    if not usuario or usuario.rol not in ["comercial", "general"]:
+        return jsonify({"error": "No autorizado."}), 403
+        
+    datos = request.get_json()
+    descuento = datos.get("descuento")
+    if descuento is None:
+        return jsonify({"error": "Falta el campo descuento."}), 400
+        
+    if descuento not in [0, 10, 25, 50]:
+        return jsonify({"error": "Descuento inválido. Valores permitidos: 0, 10, 25, 50."}), 400
+        
+    alojamiento = Alojamiento.query.get(id)
+    if not alojamiento:
+        return jsonify({"error": "Alojamiento no encontrado."}), 404
+        
+    alojamiento.descuento = int(descuento)
+    try:
+        db.session.commit()
+        return jsonify({"mensaje": "Promoción actualizada con éxito.", "alojamiento": alojamiento.to_dict()}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/admin/usuarios", methods=["GET"])
+@jwt_required()
+def listar_usuarios_admin():
+    usuario_id = get_jwt_identity()
+    usuario = Usuario.query.get(int(usuario_id))
+    if not usuario or usuario.rol != "general":
+        return jsonify({"error": "Acceso denegado. Se requieren permisos de administrador general."}), 403
+        
+    usuarios = Usuario.query.order_by(Usuario.fecha_creacion.desc()).all()
+    return jsonify([u.to_dict() for u in usuarios]), 200
+
+
+@app.route("/api/admin/usuarios/<id>/rol", methods=["PUT"])
+@jwt_required()
+def cambiar_rol_usuario(id):
+    usuario_id = get_jwt_identity()
+    usuario_solicitante = Usuario.query.get(int(usuario_id))
+    if not usuario_solicitante or usuario_solicitante.rol != "general":
+        return jsonify({"error": "Acceso denegado. Se requieren permisos de administrador general."}), 403
+        
+    datos = request.get_json()
+    nuevo_rol = datos.get("rol")
+    if not nuevo_rol or nuevo_rol not in ["cliente", "comercial", "general"]:
+        return jsonify({"error": "Rol inválido."}), 400
+        
+    usuario_destino = Usuario.query.get(int(id))
+    if not usuario_destino:
+        return jsonify({"error": "Usuario no encontrado."}), 404
+        
+    usuario_destino.rol = nuevo_rol
+    try:
+        db.session.commit()
+        return jsonify({"mensaje": "Rol actualizado con éxito.", "usuario": usuario_destino.to_dict()}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/admin/estadisticas", methods=["GET"])
+@jwt_required()
+def obtener_estadisticas():
+    usuario_id = get_jwt_identity()
+    usuario = Usuario.query.get(int(usuario_id))
+    if not usuario or usuario.rol != "general":
+        return jsonify({"error": "Acceso denegado. Se requieren permisos de administrador general."}), 403
+        
+    # Obtener todas las reservas de la base de datos
+    reservas = Reserva.query.all()
+    alojamientos = Alojamiento.query.all()
+    
+    # 1. Calcular ingresos totales
+    ingresos_totales = sum(r.precio_total for r in reservas)
+    
+    # 2. Total de reservas
+    total_reservas = len(reservas)
+    
+    # 3. Reservas confirmadas vs pendientes
+    confirmadas = len([r for r in reservas if r.estado == "confirmed"])
+    
+    # 4. Tasa de conversión simulada basada en visitas ficticias (ej. 1500 visitas)
+    visitas_simuladas = 1500
+    tasa_conversion = round((total_reservas / visitas_simuladas) * 100, 2) if total_reservas > 0 else 0.0
+    
+    # 5. Ingresos mes a mes (Año 2026 completo)
+    ingresos_por_mes = {m: 0 for m in range(1, 13)}
+    for r in reservas:
+        if r.check_in.year == 2026:
+            ingresos_por_mes[r.check_in.month] += r.precio_total
+            
+    ingresos_mensuales_lista = [
+        {"mes": datetime(2026, m, 1).strftime("%B").capitalize()[:3], "monto": ingresos_por_mes[m]}
+        for m in range(1, 13)
+    ]
+    
+    # Traducir meses a español
+    meses_es = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+    for idx, item in enumerate(ingresos_mensuales_lista):
+        item["mes"] = meses_es[idx]
+        
+    # 6. Comparativa mes actual vs mes anterior (Junio 2026 vs Mayo 2026)
+    mes_actual = 6  # Asumimos junio 2026 según fecha del sistema
+    mes_anterior = 5
+    ingresos_mes_actual = ingresos_por_mes[mes_actual]
+    ingresos_mes_anterior = ingresos_por_mes[mes_anterior]
+    
+    diferencia_porcentaje = 0
+    if ingresos_mes_anterior > 0:
+        diferencia_porcentaje = round(((ingresos_mes_actual - ingresos_mes_anterior) / ingresos_mes_anterior) * 100, 1)
+    elif ingresos_mes_actual > 0:
+        diferencia_porcentaje = 100.0  # Si el mes anterior fue 0 e ingresos actuales > 0, es 100% de aumento
+        
+    # 7. Reservas por provincia
+    reservas_por_provincia = {}
+    for r in reservas:
+        if r.alojamiento:
+            prov = r.alojamiento.provincia
+            reservas_por_provincia[prov] = reservas_por_provincia.get(prov, 0) + 1
+            
+    # Convertir a lista de diccionarios para el gráfico
+    reservas_por_provincia_lista = [
+        {"provincia": prov, "cantidad": cant}
+        for prov, cant in reservas_por_provincia.items()
+    ]
+    
+    return jsonify({
+        "ingresos_totales": ingresos_totales,
+        "total_reservas": total_reservas,
+        "reservas_confirmadas": confirmadas,
+        "tasa_conversion": tasa_conversion,
+        "ingresos_mes_actual": ingresos_mes_actual,
+        "ingresos_mes_anterior": ingresos_mes_anterior,
+        "diferencia_porcentaje": diferencia_porcentaje,
+        "ingresos_mensuales": ingresos_mensuales_lista,
+        "reservas_por_provincia": reservas_por_provincia_lista
+    }), 200
 
 
 if __name__ == "__main__":
