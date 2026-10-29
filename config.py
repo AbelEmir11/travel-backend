@@ -10,9 +10,11 @@ def get_database_uri():
     if not db_url or "TU_CONTRASENA_MYSQL" in db_url:
         return "sqlite:///travel.db"
         
-    # Compatibilidad con Supabase / Heroku / Render PostgreSQL (cambiar postgres:// por postgresql://)
+    # Compatibilidad con Supabase / Heroku / Render PostgreSQL
     if db_url.startswith("postgres://"):
-        db_url = db_url.replace("postgres://", "postgresql://", 1)
+        db_url = db_url.replace("postgres://", "postgresql+psycopg2://", 1)
+    elif db_url.startswith("postgresql://"):
+        db_url = db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
 
     if db_url.startswith("postgresql"):
         return db_url
