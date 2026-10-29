@@ -114,6 +114,8 @@ class Reserva(db.Model):
         return {
             "id": self.id,
             "usuario_id": self.usuario_id,
+            "usuario_nombre": self.usuario.nombre if self.usuario else "",
+            "usuario_email": self.usuario.email if self.usuario else "",
             "alojamiento_id": self.alojamiento_id,
             "alojamiento_titulo": self.alojamiento.titulo if self.alojamiento else "",
             "alojamiento_ubicacion": self.alojamiento.ubicacion if self.alojamiento else "",
